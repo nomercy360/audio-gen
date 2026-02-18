@@ -19,6 +19,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import https from "node:https";
+import http from "node:http";
 
 // ── Configuration ──────────────────────────────────────────────
 
@@ -66,57 +68,63 @@ function buildUrl(action, params = {}) {
 }
 
 /**
+ * Raw HTTPS GET request — bypasses fetch() which in Claude Desktop's runtime
+ * sends Referer/Origin headers that Forvo rejects as "incorrect domain".
+ * Using node:https gives us full control over headers.
+ */
+function rawGet(url) {
+  return new Promise((resolve, reject) => {
+    const mod = url.startsWith("https") ? https : http;
+    const req = mod.get(url, { headers: { "Accept": "application/json" } }, (res) => {
+      // Follow redirects
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        rawGet(res.headers.location).then(resolve, reject);
+        return;
+      }
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => {
+        const buffer = Buffer.concat(chunks);
+        resolve({ status: res.statusCode, statusMessage: res.statusMessage, buffer });
+      });
+      res.on("error", reject);
+    });
+    req.on("error", reject);
+    req.setTimeout(HTTP_TIMEOUT_MS, () => {
+      req.destroy();
+      reject(new Error(`Request timed out after ${HTTP_TIMEOUT_MS}ms`));
+    });
+  });
+}
+
+/**
  * Make a GET request to the Forvo API with timeout and error handling.
  */
 async function forvoRequest(action, params = {}) {
   const url = buildUrl(action, params);
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), HTTP_TIMEOUT_MS);
+  log("debug", `Forvo API request: ${action}`, { params });
 
-  try {
-    log("debug", `Forvo API request: ${action}`, { params });
-    const response = await fetch(url, { signal: controller.signal });
+  const { status, statusMessage, buffer } = await rawGet(url);
+  const body = buffer.toString("utf-8");
 
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(
-        `Forvo API error: ${response.status} ${response.statusText}${body ? ` — ${body}` : ""}`
-      );
-    }
-
-    return await response.json();
-  } catch (err) {
-    if (err.name === "AbortError") {
-      throw new Error(`Forvo API request timed out after ${HTTP_TIMEOUT_MS}ms`);
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
+  if (status < 200 || status >= 300) {
+    throw new Error(
+      `Forvo API error: ${status} ${statusMessage}${body ? ` — ${body}` : ""}`
+    );
   }
+
+  return JSON.parse(body);
 }
 
 /**
- * Download audio from a URL and return as base64 string.
+ * Download audio from a URL and return as Buffer.
  */
 async function downloadAudio(url) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), HTTP_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) {
-      throw new Error(`Audio download failed: ${response.status}`);
-    }
-    const buffer = await response.arrayBuffer();
-    return Buffer.from(buffer);
-  } catch (err) {
-    if (err.name === "AbortError") {
-      throw new Error(`Audio download timed out after ${HTTP_TIMEOUT_MS}ms`);
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
+  const { status, buffer } = await rawGet(url);
+  if (status < 200 || status >= 300) {
+    throw new Error(`Audio download failed: ${status}`);
   }
+  return buffer;
 }
 
 // ── Input validation ───────────────────────────────────────────
@@ -664,4 +672,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
-log("info", "Forvo Pronunciation MCP server running on stdio");
+log("info", "Forvo Pronunciation MCP server running on stdio", {
+  api_key_set: !!FORVO_API_KEY,
+  api_key_prefix: FORVO_API_KEY ? FORVO_API_KEY.slice(0, 6) + "..." : "MISSING",
+  base_url: FORVO_BASE_URL,
+});
