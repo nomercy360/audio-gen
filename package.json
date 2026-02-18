@@ -1,7 +1,7 @@
 {
-  "name": "forvo-pronunciation",
+  "name": "japanese-audio",
   "version": "1.0.0",
-  "description": "MCP server for Forvo pronunciation API — 6M+ native speaker recordings across 430+ languages",
+  "description": "MCP server for Japanese word pronunciation audio from JapanesePod101",
   "type": "module",
   "main": "server/index.js",
   "license": "MIT",

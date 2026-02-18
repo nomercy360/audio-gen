@@ -1,10 +1,10 @@
 {
   "manifest_version": "0.3",
-  "name": "forvo-pronunciation",
-  "display_name": "Forvo Pronunciation Server",
+  "name": "japanese-audio",
+  "display_name": "Japanese Audio",
   "version": "1.0.0",
-  "description": "MCP server exposing the Forvo pronunciation API — access 6M+ native speaker audio recordings across 430+ languages",
-  "long_description": "This MCP Bundle provides access to the Forvo pronunciation API, enabling native speaker pronunciation lookups, audio downloads, word search, and language listing. Designed for integration with Anki flashcard workflows — download base64-encoded audio and attach directly to flashcards. Supports filtering by language, country, speaker sex, and rating.",
+  "description": "Download Japanese word pronunciation audio from JapanesePod101 — no API key required",
+  "long_description": "MCP server that downloads native speaker pronunciation audio for Japanese words. Uses JapanesePod101's free audio endpoint. Returns base64-encoded MP3 ready for Anki flashcard integration. Supports single and batch downloads.",
   "author": {
     "name": "Maksim Kadocnikov"
   },
@@ -15,67 +15,32 @@
       "command": "node",
       "args": [
         "${__dirname}/server/index.js"
-      ],
-      "env": {
-        "FORVO_API_KEY": "${user_config.forvo_api_key}"
-      }
+      ]
     }
   },
   "tools": [
     {
-      "name": "forvo_word_pronunciations",
-      "description": "Get all available pronunciations for a word with metadata (speaker, country, rating, audio URLs)"
+      "name": "download_audio",
+      "description": "Download Japanese word pronunciation audio as base64 MP3"
     },
     {
-      "name": "forvo_standard_pronunciation",
-      "description": "Get the single best-rated pronunciation for a word"
-    },
-    {
-      "name": "forvo_download_pronunciation",
-      "description": "Download the best pronunciation audio as base64-encoded MP3 for Anki integration"
-    },
-    {
-      "name": "forvo_search_words",
-      "description": "Search for words that have pronunciations available on Forvo"
-    },
-    {
-      "name": "forvo_language_list",
-      "description": "List all available languages with pronunciation counts"
+      "name": "batch_download_audio",
+      "description": "Download pronunciation audio for multiple Japanese words at once"
     }
   ],
   "keywords": [
-    "forvo",
+    "japanese",
     "pronunciation",
     "audio",
-    "language",
     "anki",
     "flashcards",
     "mcp"
   ],
   "license": "MIT",
-  "user_config": {
-    "forvo_api_key": {
-      "type": "string",
-      "title": "Forvo API Key",
-      "description": "Your Forvo API key. Get one at https://api.forvo.com/plans-and-pricing/",
-      "sensitive": true,
-      "required": true
-    },
-    "default_language": {
-      "type": "string",
-      "title": "Default Language",
-      "description": "Default language code for pronunciation lookups (e.g. 'ja', 'en', 'ru'). See https://forvo.com/languages-codes/",
-      "default": "ja",
-      "required": false
-    }
-  },
   "compatibility": {
     "platforms": ["darwin", "win32", "linux"],
     "runtimes": {
       "node": ">=18.0.0"
     }
-  },
-  "privacy_policies": [
-    "https://forvo.com/privacy/"
-  ]
+  }
 }
